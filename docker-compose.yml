@@ -1,0 +1,105 @@
+services:
+  springbootapp:
+    image: docker-compose
+    container_name: docker-compose
+    environment:
+      DB_USERNAME: postgres
+      DB_PASSWORD: 123
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: postgres
+    ports:
+      - "8081:8081"
+    networks:
+      - container
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:18
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: postgres
+    volumes:
+      - 'db:/var/lib/data'
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 5s
+      retries: 5
+    networks:
+      - container
+
+  keycloak:
+    image: keycloak/keycloak:26.7
+    container_name: keycloak
+    environment:
+      KC_HEALTH_ENABLED: true
+      KC_METRICS_ENABLED: true
+
+      KC_DB: postgres
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: 1234
+      KC_DB_URL: jdbc:postgresql://dbauth:5432/postgres
+
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    command: start-dev
+    depends_on:
+      dbauth:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    networks:
+      - container
+
+  dbauth:
+    image: postgres:18
+    container_name: keycloak_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 5s
+      retries: 5
+    volumes:
+      - 'kcdb:/var/lib/data'
+    networks:
+      - container
+
+  mq:
+    image: rabbitmq:management
+    container_name: mq
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: password
+    ports:
+      - "15672:15672"
+    hostname:
+      "my-rabbit"
+    networks:
+      - container
+  rustfs:
+    image: rustfs/rustfs
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - 'data:/data'
+
+volumes:
+  db:
+  kcdb:
+  data:
+
+networks:
+  container:
+    driver: bridge
+
